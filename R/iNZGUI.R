@@ -193,6 +193,9 @@ iNZGUI <- setRefClass(
                            use.scrollwindow = FALSE)
             menugrp <- ggroup(container = gtop)
             initializeMenu(menugrp, disposeR)
+
+            ## init statusbar
+            add(win, .self$initializeStatusbar()$statusbar)
             
             g <- gpanedgroup(container = gtop, expand = TRUE)
 
@@ -262,9 +265,7 @@ iNZGUI <- setRefClass(
             ## and start tracking history
             initializeCodeHistory()
 
-            ## init statusbar
-            statusbar <<- gstatusbar("iNZight is ready")# , container = win) ## disabled
-
+            statusbar$set("iNZight is ready!")
             invisible(0)
         }, ## end initialization
         ## set up the menu bar widget
@@ -862,6 +863,10 @@ iNZGUI <- setRefClass(
             add(sumGrp, sumBtn, expand = TRUE)
             add(sumGrp, infBtn, expand = TRUE)
             sumGrp
+        },
+        ## set up the status bar widget
+        initializeStatusbar = function() {
+            statusbar <<- iNZStatusWidget$new(.self)
         },
         ## set up the widget with the plot notebook
         initializePlotWidget = function() {

@@ -415,7 +415,7 @@ InstallMaps <- function(gui) {
         return()
     }
 
-    svalue(gui$statusbar) <- "Installing maps module ..."
+    gui$statusbar$set("Installing maps module ... this may take a few moments.")
     utils::install.packages(
         "iNZightMaps", 
         repos = c("https://r.docker.stat.auckland.ac.nz", "https://cran.stat.auckland.ac.nz"),
@@ -423,13 +423,13 @@ InstallMaps <- function(gui) {
     )
 
     if (!eval(parse(text = check.maps))) {
-        svalue(gui$statusbar) <- "Error installing the maps module"
+        gui$statusbar$set("Error installing the maps module", 10000)
         gmessage("Unable to install package. Please check the website.", parent = gui$win)
         return()
     }
 
     ## reload the menu ...?
-    svalue(gui$statusbar) <- "Maps module installed successfully"
+    gui$statusbar$set("Maps module installed successfully", 10000)
     gui$menuBarWidget$defaultMenu()
     gmessage("The Maps package has been installed.", parent = gui$win)
 }
