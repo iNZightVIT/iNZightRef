@@ -1,8 +1,94 @@
-## iNZight 3.4.0.9000
-__Release date__: TBA
+- move makeNames() method (part of iNZDataModWin) to 'iNZightTools' package
+  as iNZightTools::make_names()
+- specify `stringsAsFactors = TRUE` for upcoming R 4.0.0
+
+## iNZight 3.5.0
+
+- load from clipboard option
+- add option to import data from a URL as well as local files
+- remove equal variance checkbox for survey design (two way t-test)
+- survey design code pasted together with a new line when `deparse` returns multiple lines (#281, @tmelliott)
 
 
+## iNZight 3.5
+__Release date__: 11 November 2019
 
+- allow users to change column types for all import types (cat/num)
+- reset axis limits when either V1 or V2 change (temp fix until something less aggressive is implemented)
+- make title/xlab/ylab boxes reactive to keystroke
+- add RData/rda and RDS import methods to main Import window, removing Load and Save options from File menu
+- disable plotly for ridgeline density plots
+- use temporary directory for ggplot thumbnails
+- some naming changes to plot modification UI
+- deleting plots in "Plot History" window will now remove them from the plot list in the window immediately
+- gridplots now have palette selection
+- cut-point option for diverging stacked bar charts
+- the plot history window now reruns the code used for previous plots instead of storing the plot itself
+- the plot history window now has a textbox for users to modify code and run in an temporary environment
+- sortable plots now have ascending/descending option
+- enable inference for survey designs
+- addon modules now available (as a developmental feature)
+- add option to export as rda
+- allow user to select which Excel sheet to import
+- enable transparency for ridgeline plots
+- enable palettes, colouring, etc. for barcode plots
+
+## iNZight 3.4.6
+__Release date__: 23 September 2019
+
+- add gallery of previously stored plots for ggplots
+- rearrange controls for ggplots
+- add ability to rotate x/y axis for ggplots
+- change the default number of observations a square represents in gridplots
+
+
+## iNZight 3.4.5
+__Release date__: 2 September 2019
+
+- adds option to perform hypothesis test on a single proportion
+- allow users to request simulated p-value from chi-square tests
+- add option to change the number of observations a square represents in gridplots
+- add option for ridgeline ggplot
+- add controls for the width and method of swarming for beeswarm plots
+- label changes to ggplot controls
+
+
+## iNZight 3.4.4
+__Release date__: 26 August 2019
+
+- fix warnings that occur from `family = "normal"` fonts
+- fix preferences storage location on Windows Install version of iNZight
+- fix bug preventing Get Summary/Inference from working with FT plots
+
+
+## iNZight 3.4.3
+__Release date__: 13 August 2019
+
+- allow user to remove calibration design from calibration window
+- change how frequency variable is stored so it is retained after filter/modifying
+  the dataset
+- improve how replicate weights are displayed, and addition of 'remove' button
+- add option to dataset menu to view the (entire) dataset using `utils::View()`
+- add search box to filter long variable lists (iNZight home panel)
+- add option to change ggplot theme of Financial Times plots
+- add beeswarm option for plotting (using ggbeeswarm)
+- add ability to include captions for sources in Financial Times plots
+
+
+## iNZight 3.4.2
+__Release date__: 22 July 2019
+
+- modules directory no longer used (or created) on Windows, to help the updater
+- fix bug in point sizing when removing/adding box plot from dotplots
+
+
+## iNZight 3.4.1
+__Release date__: 15 July 2019
+
+- allow users to specify replicate weights in the survey design
+- specify post stratification information to existing survey design
+- specify frequency column to use in plots, summary, and inference
+- add suite of Financial Times plots (using ggplot2) (#211, @daniel-barnett)
 
 
 # iNZight 3.4

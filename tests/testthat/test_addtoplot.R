@@ -30,7 +30,14 @@ test_that("Add to Plot shows correct options by plot", {
 
     atptbl <- ui$moduleWindow$body$children[[1]]$children[[1]]$children
     expect_equal(svalue(atptbl[[3]]), "dot plot")
-    expect_equal(atptbl[[3]]$get_items(), c("dot plot", "histogram"))
+    expect_equal(
+        atptbl[[3]]$get_items(), 
+        c(
+            "dot plot", "histogram", "(gg) dot strip", "(gg) barcode",
+            "(gg) boxplot", "(gg) beeswarm", "(gg) violin", "(gg) density", 
+            "(gg) column/row bar", "(gg) lollipop", "(gg) cumulative curve"
+        )
+    )
 
     # change to scatter plot
     ui$moduleWindow$footer$children[[2]]$invoke_change_handler()
@@ -56,8 +63,15 @@ test_that("Add to Plot shows correct options by plot", {
     cmbo <- ui$moduleWindow$header$children[[2]]$children[[1]]
     expect_equal(svalue(cmbo), "Customise Plot Appearance")
     expect_equal(cmbo$get_items(), atpOpts[c(1, 3)])
-    ## bar plot doesn't have plot type options, yet
-    
+
+    atptbl <- ui$moduleWindow$body$children[[1]]$children[[1]]$children
+    expect_equal(atptbl[[3]]$get_items(), 
+        c(
+            "barplot", "(gg) column/row bar", "(gg) stacked column/row", 
+            "(gg) lollipop", "(gg) gridplot", "(gg) pie", "(gg) donut"
+        )
+    )
+
     ui$moduleWindow$footer$children[[2]]$invoke_change_handler()
     svalue(ui$ctrlWidget$V2box, TRUE) <- 1
     svalue(ui$ctrlWidget$V1box, TRUE) <- 1
@@ -103,6 +117,24 @@ test_that("Axes and Labels - dot plots", {
     ui$moduleWindow$footer$children[[2]]$invoke_change_handler()
     ui$getActiveDoc()$setSettings(list(xlim = NULL, ylim = NULL))
     svalue(ui$ctrlWidget$V1box, TRUE) <- 1
+})
+
+test_that("Changing variable resets axis limits", {
+    svalue(ui$ctrlWidget$V1box) <- "height"
+    ui$plotToolbar$addToPlot(message = FALSE)
+    svalue(ui$moduleWindow$header$children[[2]]$children[[1]], TRUE) <- 2
+
+    upd <- ui$moduleWindow$body$children[[2]]$children[[2]]
+    axtbl <- ui$moduleWindow$body$children[[1]]$children[[1]]$children
+    svalue(axtbl[[10]]) <- "150"
+    svalue(axtbl[[11]]) <- "200"
+    upd$invoke_change_handler()
+
+    ui$moduleWindow$footer$children[[2]]$invoke_change_handler()
+
+    expect_equal(ui$getActiveDoc()$getSettings()$xlim, c(150, 200))
+    expect_silent(svalue(ui$ctrlWidget$V1box) <- "rightfoot")
+    expect_null(ui$getActiveDoc()$getSettings()$xlim)
 })
 
 test_that("Axes and Labels - scatter plots", {

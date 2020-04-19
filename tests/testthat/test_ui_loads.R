@@ -1,7 +1,6 @@
 context("The user interface loads")
 
 ui <- NULL
-on.exit(gWidgets2::dispose(ui$win))
 
 test_that("GUI is loaded and initialized without problems", {
     ## load (and then close) the ui object
@@ -12,7 +11,10 @@ test_that("GUI is loaded and initialized without problems", {
     expect_equal(ui$initializeGui(), 0)
 
     ## the new initialized UI window should have several important objects ...
-    expect_equal(ui$getActiveData(), data.frame(empty = " "))
+    expect_equal(
+        ui$getActiveData(),
+        data.frame(empty = " ", stringsAsFactors = TRUE)
+    )
     expect_equal(length(ui$iNZDocuments), 1)
     expect_is(ui$iNZDocuments[[1]], "iNZDocument")
 })
@@ -29,3 +31,29 @@ test_that("Primary UI widgets are loaded and displaying correctly", {
     expect_equal(svalue(ui$ctrlWidget$G2box), "Select/Drag-drop Variable 4 (subset)")
 })
 
+# ui <<- iNZGUI$new(); ui$initializeGui()
+test_that("Data view loads", {
+    expect_silent(ui$setDocument(iNZDocument$new(data = iris)))
+    expect_equal(ui$dataNameWidget$datName, "data")
+    df <- ui$dataViewWidget$dfView$children[[1]]
+    expect_is(df, "GDf")
+    expect_equal(df$get_dim(), c(rows = 150, cols = 5))
+})
+
+test_that("UI closes quietly", {
+    expect_silent(ui$close())
+})
+
+# load_all(); ui$close(); ui <- iNZGUI$new()
+
+test_that("Variable list can be searched", {
+    ui$initializeGui(gapminder)
+    ui$dataViewWidget$listView()
+    expect_true(visible(ui$dataViewWidget$varView))
+
+    svalue(ui$dataViewWidget$searchBox) <- "pop"
+    expect_equal(
+        ui$dataViewWidget$varWidget$get_items(),
+        names(gapminder)[grepl("pop", names(gapminder), ignore.case = TRUE)]
+    )
+})

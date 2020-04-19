@@ -41,15 +41,6 @@ iNZMenuBarWidget <- setRefClass(
         },
         FileMenu = function() {
             list(
-                load =
-                    gaction("Load ...",
-                        icon = "symbol_diamond",
-                        handler = function(h, ...) iNZLoadSaveWin$new(GUI, what = "load")),
-                save =
-                    gaction("Save ...",
-                        icon = "save",
-                        handler = function(h, ...) iNZLoadSaveWin$new(GUI, what = "save")),
-                gseparator(),
                 import =
                     gaction("Import data ...",
                         icon = "symbol_diamond",
@@ -59,6 +50,14 @@ iNZMenuBarWidget <- setRefClass(
                     gaction("Export data ...",
                         icon = "symbol_diamond",
                         handler = function(h, ...) iNZSaveWin$new(GUI, type = "data", data = GUI$getActiveData())),
+                gseparator(),
+                paste =
+                    gaction("Paste from ...",
+                        icon = "symbol_diamond",
+                        tooltip = "Import data by pasting/clipboard",
+                        handler = function(h, ...)
+                            iNZClipboard$new(GUI, type = "paste")
+                    ),
                 gseparator(),
                 example =
                     gaction("Example data ...",
@@ -118,6 +117,11 @@ iNZMenuBarWidget <- setRefClass(
                           icon = "symbol_diamond",
                           handler = function(h, ...) iNZValidateWin$new(GUI)),
                 gseparator(),
+                view =
+                    gaction("View full dataset",
+                        icon = "symbol_diamon",
+                        handler = function(h, ...) GUI$view_dataset()
+                    ),
                 rename =
                     gaction("Rename ...",
                         icon = "symbol_diamond",
@@ -141,26 +145,50 @@ iNZMenuBarWidget <- setRefClass(
                             handler = function(h, ...) iNZappendrowWin$new(GUI))
                 ),
                 gseparator(),
-                surveydesign =
-                    gaction("Specify survey design [beta] ...",
-                        icon = "symbol_diamond",
-                        handler = function(h, ...) iNZSurveyDesign$new(GUI)),
-                removedesign =
-                    gaction("Remove design",
-                        icon = "symbol_diamond",
-                        handler = function(h, ...) GUI$removeDesign()),
-                gseparator(),
-                expandtable =
-                    gaction("Expand table",
-                        icon = "symbol_diamond",
-                        handler = function(h, ...) iNZexpandTblWin$new(GUI)
-                    ),
-                setfrequency =
-                    gaction("Specify frequency column",
-                        icon = "symbol_diamond",
-                        handler = function(h, ...)
-                            iNZSurveyDesign$new(GUI, freq = TRUE)
-                    )
+                "Survey design" = list(
+                    surveydesign =
+                        gaction("Specify design ...",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...)
+                                iNZSurveyDesign$new(GUI, type = "survey")
+                        ),
+                    repdesign =
+                        gaction("Specify replicate design ...",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...)
+                                iNZSurveyDesign$new(GUI, type = "replicate")
+                        ),
+                    poststrat =
+                        gaction("Post stratify ...",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...) iNZSurveyPostStrat$new(GUI)
+                        ),
+                    removedesign =
+                        gaction("Remove design",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...) GUI$removeDesign()
+                        )
+                ),
+                "Frequency tables" = list(
+                    expandtable =
+                        gaction("Expand table",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...) iNZexpandTblWin$new(GUI)
+                        ),
+                    setfrequency =
+                        gaction("Specify frequency column",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...)
+                                iNZSurveyDesign$new(GUI, type = "frequency")
+                        ),
+                    dropfrequency =
+                        gaction("Remove frequency column",
+                            icon = "symbol_diamond",
+                            handler = function(h, ...) {
+                                GUI$getActiveDoc()$setSettings(list(freq = NULL))
+                            }
+                        )
+                )
             )
         },
         VariablesMenu = function() {
@@ -281,7 +309,14 @@ iNZMenuBarWidget <- setRefClass(
                 ))
             }
 
-            list(
+            ## As of R 3.6.?, overwriting s3 methods is a verbose message
+            ## when loading a package namespace. This prevents those messages
+            ## from showing up.
+            ## Info: it's because iNZightRegression and iNZightMR both define
+            ## moecalc methods - not sure why/which is more up to date, either ...
+            suppressMessages(requireNamespace("iNZightModules", quietly = TRUE))
+
+            adv <- list(
                 "Quick Explore" = list(
                     missing =
                         gaction("Missing values",
@@ -340,12 +375,39 @@ iNZMenuBarWidget <- setRefClass(
                         icon = "symbol_diamond",
                         handler = function(h, ...) iNZightModules::iNZightMapLanding$new(GUI)),
                 gseparator(),
+                install =
+                    gaction("Add or remove modules ...",
+                        icon = "symbol_diamond",
+                        tooltip = "Add or remove add-on iNZight modules",
+                        handler = function(h, ...)
+                            iNZightModules::InstallModules$new(GUI)
+                    ),
+                gseparator(),
                 rcode =
                     gaction("R code history [beta] ...",
                         icon = "symbol_diamond",
                         tooltip = "Show the R code history for your session",
                         handler = function(h, ...) GUI$showHistory())
             )
+            if (!is.null(GUI$addonModuleDir)) {
+                modules <- iNZightModules:::getModules(GUI$addonModuleDir)
+                if (length(modules)) {
+                    instindex <- which(names(adv) == "maps") + 1
+                    mods <- lapply(modules, function(mod) {
+                        gaction(mod$display_name,
+                            handler = function(h, ...) {
+                                x <- sprintf("mod$%s$new(GUI, name = '%s')",
+                                    mod$name,
+                                    mod$display_name
+                                )
+                                eval(parse(text = x))
+                            }
+                        )
+                    })
+                    adv <- c(adv[1:(instindex-1)], mods, adv[instindex:length(adv)])
+                }
+            }
+            adv
         },
         HelpMenu = function() {
             guides <- list(user_guides.basics = "The Basics",
@@ -415,14 +477,14 @@ iNZAboutWidget <- setRefClass(
             g <- gvbox(expand = FALSE, cont = w, spacing = 5)
             g$set_borderwidth(10)
             mainlbl <- glabel("iNZight", container = g)
-            font(mainlbl) <- list(weight = "bold", family = "normal", size = 20)
+            font(mainlbl) <- list(weight = "bold", family = "sans", size = 20)
             verlbl <- glabel(sprintf("Version %s - Released %s",
                                      packageDescription("iNZight")$Version,
                                      format(as.POSIXct(packageDescription("iNZight")$Date),
                                             "%d %B, %Y")), container = g)
-            font(verlbl) <- list(weight = "normal", family = "normal", size = 10)
+            font(verlbl) <- list(weight = "normal", family = "sans", size = 10)
             rverlbl <- glabel(sprintf("Running on R version %s", getRversion()), container = g)
-            font(rverlbl) <- list(weight = "normal", family = "normal", size = 10)
+            font(rverlbl) <- list(weight = "normal", family = "sans", size = 10)
             addSpace(g, 10)
             gpltxt <- gtext(expand = TRUE, cont = g, wrap = TRUE)
             insert(gpltxt, paste("\n\nThis program is free software; you can redistribute it and/or",
@@ -443,7 +505,7 @@ iNZAboutWidget <- setRefClass(
                    font.attr = list(size = 9)) -> l4
             addSpace(g, 5)
             contactlbl <- glabel("For help, contact inzight_support@stat.auckland.ac.nz", container = g)
-            font(contactlbl) <- list(weight = "normal", family = "normal", size = 8)
+            font(contactlbl) <- list(weight = "normal", family = "sans", size = 8)
             visible(w) <- TRUE
         }
     )

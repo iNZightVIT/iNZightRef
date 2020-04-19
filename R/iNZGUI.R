@@ -59,7 +59,9 @@ iNZGUI <- setRefClass(
             moduledata = "list",
             ## keep a track of R code history
             rhistory = "ANY",
-            disposer = "logical"
+            plot_history = "ANY",
+            disposer = "logical",
+            addonModuleDir = "character"
         ),
         prototype = list(
             activeDoc = 1,
@@ -73,7 +75,11 @@ iNZGUI <- setRefClass(
         ##              closing the gui
         ## This is the main method of iNZight and calls all the other
         ## methods of the GUI class.
-        initializeGui = function(data = NULL, disposeR = FALSE) {
+        initializeGui = function(
+            data = NULL,
+            disposeR = FALSE,
+            addonDir = NULL
+        ) {
             "Initiates the GUI"
             iNZDocuments <<- list(iNZDocument$new(data = data))
             disposer <<- disposeR
@@ -96,10 +102,6 @@ iNZGUI <- setRefClass(
                     done <- FALSE
                     if (file.exists(file.path("~", "iNZightVIT"))) {
                         setwd(file.path("~", "iNZightVIT"))
-
-                        ## Now check to see if there is a library in there ...
-                        if (!file.exists("modules"))
-                            dir.create("modules")
                     } else {
                         ## Create it:
                         conf <- gconfirm(
@@ -108,26 +110,11 @@ iNZGUI <- setRefClass(
                             title = "Create Folder", icon = "question")
 
                         if (conf) {
-                            if ( dir.create(file.path("~", "iNZightVIT")) ) {
-                                ## copy the Data folder:
-                                ##try(file.copy("Data.lnk", file.path("~", "iNZightVIT")), TRUE)
-                                ##try(file.symlink("data", file.path("~", "iNZightVIT")), TRUE)
-
-                                ##setwd(file.path("~", "iNZightVIT"))
-
-                                dir.create(file.path("~", "iNZightVIT", "modules"))
-
-                                done <- TRUE
-                            }
-
+                            done <- dir.create(file.path("~", "iNZightVIT"))
                             if (!done)
                                 gmessage("iNZight was unable to create the folder.")
                         }
                     }
-
-                    ## Add the module library path if it exists
-                    if (file.exists(file.path("~", "iNZightVIT", "modules")))
-                        .libPaths(c(file.path("~", "iNZightVIT", "modules"), .libPaths()))
                 },
                 "mac" = {
                     done <- FALSE
@@ -142,7 +129,6 @@ iNZGUI <- setRefClass(
 
                         if (conf) {
                             if ( dir.create(file.path("~", "Documents", "iNZightVIT")) ) {
-                                dir.create(file.path("~", "Documents", "iNZightVIT", "modules"))
                                 try(setwd(Sys.getenv("R_DIR")), TRUE)
 
                                 done <- TRUE
@@ -166,6 +152,19 @@ iNZGUI <- setRefClass(
                 }
             )
 
+            if (!is.null(addonDir) && dir.exists(addonDir)) {
+                addonModuleDir <<- addonDir
+            } else {
+                addonModuleDir <<- switch(OS,
+                    "windows" =
+                        file.path("~", "iNZightVIT", "modules"),
+                    "mac" = ,
+                    "linux" =
+                        file.path("~", "Documents", "iNZightVIT", "modules")
+                )
+                if (!dir.exists(addonModuleDir))
+                    addonModuleDir <<- NULL
+            }
 
             ## Grab settings file (or try to!)
             getPreferences()
@@ -266,6 +265,7 @@ iNZGUI <- setRefClass(
             initializeCodeHistory()
 
             statusbar$set("iNZight is ready!")
+            plot_history <<- NULL
             invisible(0)
         }, ## end initialization
         ## set up the menu bar widget
@@ -361,6 +361,9 @@ iNZGUI <- setRefClass(
                 "Get Summary",
                 handler = function(h, ...) {
                     curSet <- getActiveDoc()$getSettings()
+                    curSet$plottype <- NULL
+                    if (!is.null(curSet$freq))
+                        curSet$freq <- getActiveData()[[curSet$freq]]
                     if (!is.null(curSet$x)) {
                         if (is_num(curSet$x) & is_num(curSet$y)) {
                             tmp.x <- curSet$y
@@ -524,7 +527,7 @@ iNZGUI <- setRefClass(
                                                 function(object)
                                                     predict(
                                                         object,
-                                                        newdata = data.frame(x = curSet$x)
+                                                        newdata = data.frame(x = curSet$x, stringsAsFactors = TRUE)
                                                     )
                                             else
                                                 function(object)
@@ -534,7 +537,7 @@ iNZGUI <- setRefClass(
                                         if (is_cat(curSet$x) || is_cat(curSet$y)) { #} || length(curSet$trend) == 1) {
                                             ## just the one
                                             fit <- with(curSet, lm(if (is_num(curSet$y)) y ~ x else x ~ y, na.action = na.exclude))
-                                            pred <- data.frame(FUN(fit))
+                                            pred <- data.frame(FUN(fit), stringsAsFactors = TRUE)
                                             colnames(pred) <- svalue(fittedName)
                                         } else if (length(curSet$trend) >= 1) {
                                             ## for each trend line
@@ -553,17 +556,17 @@ iNZGUI <- setRefClass(
                                             })
                                         }
                                         if (!is.null(pred))
-                                            newdata <- data.frame(getActiveData(), pred)
+                                            newdata <- data.frame(getActiveData(), pred, stringsAsFactors = TRUE)
                                         else
                                             newdata <- getActiveData()
 
 
                                         if (curSet$smooth > 0 && is_num(curSet$x) && is_num(curSet$y)) {
-                                            tmp <- data.frame(x = curSet$x, y = curSet$y)
+                                            tmp <- data.frame(x = curSet$x, y = curSet$y, stringsAsFactors = TRUE)
                                             fit <- with(curSet, loess(y ~ x, span = curSet$smooth, family = "gaussian", degree = 1, na.action = "na.exclude"))
-                                            pred <- data.frame(FUN(fit))
+                                            pred <- data.frame(FUN(fit), stringsAsFactors = TRUE)
                                             colnames(pred) <- svalue(fittedName.smth)
-                                            newdata <- data.frame(newdata, pred)
+                                            newdata <- data.frame(newdata, pred, stringsAsFactors = TRUE)
                                         }
 
 
@@ -610,6 +613,9 @@ iNZGUI <- setRefClass(
                 "Get Inference",
                 handler = function(h, ...) {
                     curSet <- getActiveDoc()$getSettings()
+                    curSet$plottype <- NULL
+                    if (!is.null(curSet$freq))
+                        curSet$freq <- getActiveData()[[curSet$freq]]
                     if (!is.null(curSet$x)) {
                         ## Figure out what type of inference will be happening:
                         xnum <- is_num(curSet$x)
@@ -642,9 +648,11 @@ iNZGUI <- setRefClass(
 
                         ## Design or data?
                         curMod <- getActiveDoc()$getModel()
+                        is_survey <- FALSE
                         if (!is.null(curMod$dataDesign)) {
                             curSet$data <- NULL
                             curSet$design <- curMod$createSurveyObject()
+                            is_survey <- TRUE
                         }
 
                         w <- gwindow(
@@ -663,33 +671,50 @@ iNZGUI <- setRefClass(
                         ## Inference method
                         lbl <- glabel("Method :")
                         infMthd <- gradio(c("Normal", "Bootstrap"), horizontal = TRUE)
-                        tbl[ii, 1:3, anchor = c(1, 0), expand = TRUE] <- lbl
-                        tbl[ii, 4:6, expand = TRUE] <- infMthd
-                        ii <- ii + 1
+                        if (!is_survey) {
+                            tbl[ii, 1:3, anchor = c(1, 0), expand = TRUE] <- lbl
+                            tbl[ii, 4:6, expand = TRUE] <- infMthd
+                            ii <- ii + 1
+                        }
 
                         ii <- ii + 1
-
 
                         doHypTest <- grepl("ttest|anova|table", INFTYPE)
+                        if (doHypTest &&
+                            is_survey &&
+                            grepl("oneway-table", INFTYPE)) {
+                            ## don't do it for chi-square (yet)
+                            doHypTest <- length(levels(curSet$x)) == 2
+                        }
                         test.type <- switch(
                             INFTYPE,
                             "onesample-ttest" = "One Sample t-test",
                             "twosample-ttest" = "Two Sample t-test",
                             "anova"           = "ANOVA",
                             "regression"      = "Regression Analysis",
-                            "oneway-table"    = ,
+                            "oneway-table"    =
+                                ifelse(is_survey && length(levels(curSet$x)) == 2,
+                                    "Test proportion",
+                                    "Chi-square test"
+                                ),
                             "twoway-table"    = "Chi-square test"
                         )
-
 
                         ## Checkbox: perform hypothesis test? Activates hypothesis options.
                         TTEST <- grepl("ttest", INFTYPE)
                         TTEST2 <- INFTYPE == "twosample-ttest"
+                        CHI2 <- grepl("twoway-table", INFTYPE) ||
+                            (grepl("oneway-table", INFTYPE) && !is_survey)
+                        PROPTEST <- INFTYPE == "oneway-table"
+                        PROPTEST2 <- PROPTEST && length(levels(curSet$x)) == 2
                         hypTest <-
                             if (TTEST2)
                                 gradio(c("None", "Two Sample t-test", "ANOVA"), horizontal = TRUE)
+                            else if (PROPTEST2 && !is_survey)
+                                gradio(c("None", "Chi-square test", "Test proportion"), horizontal = TRUE)
                             else
                                 gcheckbox(test.type, checked = FALSE)
+
                         if (doHypTest) {
                             lbl <- glabel("Hypothesis Testing")
                             font(lbl) <- list(weight = "bold")
@@ -709,12 +734,17 @@ iNZGUI <- setRefClass(
                                 tbl[ii, 1:3, anchor = c(1, 0), expand = TRUE] <- lbl
                                 tbl[ii, 4:6, expand = TRUE] <- hypVal
                                 ii <- ii + 1
+                            } else if (PROPTEST2) {
+                                tbl[ii, 1:3, anchor = c(1, 0), expand = TRUE] <- lbl
+                                svalue(hypVal) <- "0.5"
+                                tbl[ii, 4:6, expand = TRUE] <- hypVal
+                                ii <- ii + 1
                             }
 
                             ## alternative hypothesis
                             lbl <- glabel("Alternative Hypothesis :")
                             hypAlt <- gcombobox(c("two sided", "greater than", "less than"))
-                            if (TTEST) {
+                            if (TTEST || PROPTEST2) {
                                 tbl[ii, 1:3, anchor = c(1, 0), expand = TRUE] <- lbl
                                 tbl[ii, 4:6, expand = TRUE] <- hypAlt
                                 ii <- ii + 1
@@ -722,21 +752,52 @@ iNZGUI <- setRefClass(
 
                             enabled(hypAlt) <- enabled(hypVal) <-
                                 if (TTEST2) svalue(hypTest, index = TRUE) == 2
+                                else if (PROPTEST2 && !is_survey) svalue(hypTest, index = TRUE) == 3
                                 else svalue(hypTest)
 
                             ## use equal variance assumption?
                             hypEqualVar <- gcheckbox("Use equal-variance", checked = FALSE)
-                            if (TTEST2) {
+                            if (TTEST2 && !is_survey) {
                                 tbl[ii, 4:6, expand = TRUE] <- hypEqualVar
                                 ii <- ii + 1
 
                                 enabled(hypEqualVar) <- svalue(hypTest, index = TRUE) == 2
                             }
+
+                            hypSimPval <- gcheckbox("Simulate p-value",
+                                checked = FALSE)
+                            if (CHI2 && !is_survey) {
+                                tbl[ii, 4:6, expand = TRUE] <- hypSimPval
+                                ii <- ii + 1
+
+                                enabled(hypSimPval) <-
+                                    if (PROPTEST2) svalue(hypTest, index = TRUE) == 2
+                                    else svalue(hypTest)
+                            }
+
+                            hypExactPval <- gcheckbox("Calculate exact p-value",
+                                checked = FALSE)
+                            if (PROPTEST2 && !is_survey) {
+                                tbl[ii, 4:6, expand = TRUE] <- hypExactPval
+                                ii <- ii + 1
+
+                                enabled(hypExactPval) <- svalue(hypTest, index = TRUE) == 3
+                            }
                         }
 
                         addHandlerChanged(hypTest, function(h, ...) {
-                            enabled(hypEqualVar) <- enabled(hypAlt) <- enabled(hypVal) <-
+                            if (CHI2)
+                                enabled(hypSimPval) <-
+                                    if (PROPTEST2 && !is_survey) svalue(hypTest, index = TRUE) == 2
+                                    else svalue(hypTest)
+                            enabled(hypExactPval) <-
+                                if (PROPTEST2 && !is_survey) svalue(hypTest, index = TRUE) == 3
+                                else FALSE
+                            enabled(hypEqualVar) <-
+                            enabled(hypAlt) <-
+                            enabled(hypVal) <-
                                 if (TTEST2) svalue(hypTest, index = TRUE) == 2
+                                else if (PROPTEST2 && !is_survey) svalue(hypTest, index = TRUE) == 3
                                 else svalue(h$obj)
                         })
 
@@ -781,6 +842,14 @@ iNZGUI <- setRefClass(
                         btn <- gbutton("OK", handler = function(h, ...) {
                             infType <- svalue(infMthd, index = TRUE)
                             curSet <- getActiveDoc()$getSettings()
+                            curSet$plottype <- NULL
+                            curMod <- getActiveDoc()$getModel()
+                            if (!is.null(curMod$dataDesign)) {
+                                curSet$data <- NULL
+                                curSet$design <- curMod$createSurveyObject()
+                            }
+                            if (!is.null(curSet$freq))
+                                curSet$freq <- getActiveData()[[curSet$freq]]
                             if (!is.null(curSet$x)) {
                                 if (is.numeric(curSet$x) & is.numeric(curSet$y)) {
                                     tmp.x <- curSet$y
@@ -791,6 +860,16 @@ iNZGUI <- setRefClass(
                                     curSet$varnames$y <- v$x
                                 }
                             }
+                            if (is.null(curSet$g1) & !is.null(curSet$g2)) {
+                                if (curSet$g2.level != "_ALL") {
+                                    curSet$g1 <- curSet$g2
+                                    curSet$g1.level <- curSet$g2.level
+                                    curSet$varnames$g1 <- curSet$varnames$g2
+                                }
+                                curSet$g2 <- NULL
+                                curSet$g2.level <- NULL
+                                curSet$varnames$g2 <- NULL
+                            }
                             curSet <- modifyList(
                                 curSet,
                                 list(bs.inference = infType == 2,
@@ -798,7 +877,10 @@ iNZGUI <- setRefClass(
                                      inference.type = "conf",
                                      inference.par = NULL)
                             )
-                            if (ifelse(TTEST2, svalue(hypTest, index = TRUE) > 1, svalue(hypTest))) {
+                            if ((TTEST2 && svalue(hypTest, index = TRUE) > 1) ||
+                                (PROPTEST2 && !is_survey && svalue(hypTest, index = TRUE) > 1) ||
+                                (PROPTEST2 && is_survey && svalue(hypTest)) ||
+                                (!TTEST2 && !PROPTEST2 && svalue(hypTest))) {
                                 if (is.na(as.numeric(svalue(hypVal)))) {
                                     gmessage(
                                         "Null value must be a valid number.",
@@ -816,14 +898,22 @@ iNZGUI <- setRefClass(
                                             "two.sided", "greater", "less"
                                         ),
                                         hypothesis.var.equal = svalue(hypEqualVar),
-                                        hypothesis.test = ifelse(
-                                            TTEST2,
-                                            switch(
-                                                svalue(hypTest, index = TRUE),
-                                                "default", "t.test", "anova"
-                                            ),
-                                            "default"
-                                        )
+                                        hypothesis.simulated.p.value = svalue(hypSimPval),
+                                        hypothesis.use.exact = svalue(hypExactPval),
+                                        hypothesis.test =
+                                            if (TTEST2)
+                                                switch(
+                                                    svalue(hypTest, index = TRUE),
+                                                    "default", "t.test", "anova"
+                                                )
+                                            else if (PROPTEST2 && !is_survey)
+                                                switch(svalue(hypTest, index = TRUE),
+                                                    "default", "chi2", "proportion"
+                                                )
+                                            else if (PROPTEST2 && is_survey)
+                                                "proportion"
+                                            else
+                                                "default"
                                     )
                                 )
                             } else {
@@ -900,22 +990,29 @@ iNZGUI <- setRefClass(
                             )
                             visible(w2) <- TRUE
                             try(dispose(wBoots), silent = TRUE)
+                            invisible(w2)
                         })
+
+                        ## if no hypothesis to choose from, skip window
 
                         addSpring(g)
                         add(g, btn)
 
-                        visible(w) <- TRUE
-
+                        # if (!doHypTest) {
+                            # btn$invoke_change_handler()
+                        # } else {
+                            visible(w) <- TRUE
+                        # }
+                        invisible(w)
                     } else {
                         gmessage("Please select at least one variable",
                                  parent = win)
                     }
                 })
             font(sumBtn) <<-
-                list(weight = "bold", family = "normal", color = "navy")
+                list(weight = "bold", family = "sans", color = "navy")
             font(infBtn) <<-
-                list(weight = "bold", family = "normal", color = "navy")
+                list(weight = "bold", family = "sans", color = "navy")
             add(sumGrp, sumBtn, expand = TRUE)
             add(sumGrp, infBtn, expand = TRUE)
             sumGrp
@@ -958,6 +1055,8 @@ iNZGUI <- setRefClass(
         ## plot with the current active plot settings
         updatePlot = function(allow.redraw = TRUE) {
             curPlSet <- getActiveDoc()$getSettings()
+            if (!is.null(curPlSet$freq))
+                curPlSet$freq <- getActiveData()[[curPlSet$freq]]
             if(!is.null(curPlSet$x)) {
                 # Switch x and y:
                 if (is_num(curPlSet$x) & is_num(curPlSet$y)) {
@@ -976,6 +1075,8 @@ iNZGUI <- setRefClass(
                     curPlSet$design <- curMod$createSurveyObject()
                 }
 
+                curPlSet$data_name <- dataNameWidget$datName
+
                 ## Suppress the warnings produced by iNZightPlot ...
                 suppressWarnings({
                     ## Generate the plot ... and update the interaction button
@@ -990,6 +1091,7 @@ iNZGUI <- setRefClass(
                 rawpl <- plotSplashScreen()
                 curPlot <<- NULL
                 plotType <<- "none"
+                enabled(plotToolbar$exportplotBtn) <<- FALSE
             }
             invisible(rawpl)
         },
@@ -1074,6 +1176,10 @@ iNZGUI <- setRefClass(
         ## add observer to the activeDoc class variable
         addActDocObs = function(FUN, ...) {
             .self$activeDocChanged$connect(FUN, ...)
+        },
+        view_dataset = function() {
+            d <- getActiveData()
+            utils::View(d, title = attr(d, "name"))
         },
         ## data check
         checkData = function(module) {
@@ -1218,6 +1324,11 @@ iNZGUI <- setRefClass(
                 }
             )
         },
+        initializePlotHistory = function() {
+            if (is.null(plot_history)) {
+                plot_history <<- iNZplothistory(.self)
+            }
+        },
         ## --- PREFERENCES SETTINGS and LOCATIONS etc ...
         defaultPrefs = function() {
             ## The default iNZight settings:
@@ -1294,6 +1405,9 @@ iNZGUI <- setRefClass(
                 "windows" = {
                     if (file.exists(file.path("~", "iNZightVIT"))) {
                         path <- file.path("~", "iNZightVIT", ".inzight")
+                        # on new windows installer, nest prefs file one deeper
+                        if (dir.exists(path))
+                            path <- file.path(path, ".inzight")
                     } else {
                         path <- file.path("~", ".inzight")
                     }
@@ -1397,23 +1511,12 @@ iNZGUI <- setRefClass(
 
                     grid::grid.text(
                         paste(
-                            sep = "\n",
-                            "What's changed? Y'know, in case you're interested ...",
-                            "",
-                            "- iNZight now speaks tidyverse! ",
-                            "  The data operations in the Data and Variables menus now write tidyverse code,",
-                            "  which you can see by going to Advanced > Show R code history.",
-                            "  Note that this is a new feature and still being developed.",
-                            "",
-                            "- As well as tracking filtering and other dataset operations,",
-                            "  iNZight now lets you switch between them!",
-                            "  Just use the drop down menu above the data spreadsheet.",
-                            "  iNZight will also attempt to retain the chosen variables and settings! Hurrah!",
-                            "",
-                            "- Time series module plots have been prettified (somewhat).",
-                            "",
-                            "- A bunch of other bug fixes and tweaks.",
-                            "  For more details, head to Help > Changes."
+                            readLines(
+                                system.file("splash", "whatsnew.txt",
+                                    package = "iNZight"
+                                )
+                            ),
+                            collapse = "\n"
                         ),
                         y = unit(1, "npc") - unit(8, "lines"),
                         x = 0, c(just = "left", "top"),
@@ -1429,24 +1532,12 @@ iNZGUI <- setRefClass(
 
                     grid::grid.text(
                         paste(
-                            sep = "\n",
-                            "Drag a variable into the Variable 1 slot to start exploring!",
-                            "", "",
-                            "Some helpful tips:",
-                            "",
-                            "- Click on one of the Variable boxes and use the up/down arrow keys",
-                            "  to step through the variables in the data set!",
-                            "",
-                            "- Use Add to Plot (the blue bar-graph icon with a plus)",
-                            "  to add a splash of colour to your graph.",
-                            "",
-                            "- Not sure what something does? Click it and find out!",
-                            "  The worst you can do is crash the program, and if that happens",
-                            "  it would be super helpful to you, me, and everyone else if you",
-                            "  sent off a bug report explaining what you did and what happened.",
-                            "  (See the Help Menu)",
-                            "",
-                            "- Most importantly, have fun!"
+                            readLines(
+                                system.file("splash", "instructions.txt",
+                                    package = "iNZight"
+                                )
+                            ),
+                            collapse = "\n"
                         ),
                         y = unit(1, "npc") - unit(3, "lines"),
                         x = 0, c(just = "left", "top"),
