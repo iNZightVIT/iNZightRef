@@ -31,9 +31,11 @@ Imports:
     iNZightTools (>= 1.9.1.9000),
     reshape2,
     plyr,
+    stringi,
     survey,
     colorspace,
-    magrittr
+    magrittr,
+    translatr
 Suggests:
     RODBC,
     iNZightMR (>= 2.2.4),
